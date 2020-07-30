@@ -12,7 +12,7 @@ The application will use just SQLite. Since no communication is needed for our b
 KY_AUTOSCALING_web_ENABLED                  true
 KY_AUTOSCALING_web_MAX_REPLICAS             20
 KY_AUTOSCALING_web_METRIC_NAME              passenger_workers
-KY_AUTOSCALING_web_METRIC_QUERY             avg(passenger_workers{service="ilias-simple-sidekiq-new"})
+KY_AUTOSCALING_web_METRIC_QUERY             avg(passenger_workers{service="<your_application_name>"})
 KY_AUTOSCALING_web_METRIC_TYPE              Prometheus
 KY_AUTOSCALING_web_MIN_REPLICAS             3
 KY_AUTOSCALING_web_TARGET_TYPE              Value
