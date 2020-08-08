@@ -1,0 +1,9 @@
+# This is just a normal job that runs every minute
+- name: what-am-i
+  command: echo "I am a command"
+  when: "* * * * *"
+
+# This is a job that runs every minute and uses environment variables
+- name: using-env-vars
+  command: echo $WORKFLOW_RELEASE
+  when: "* * * * *"

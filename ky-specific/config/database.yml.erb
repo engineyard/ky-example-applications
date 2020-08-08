@@ -1,0 +1,8 @@
+development:
+  adapter:   postgresql
+  database:  '<%= ENV["db_yml_dbname"] %>'
+  username:  '<%= ENV["db_yml_user"] %>'
+  password:  '<%= ENV["db_yml_password"] %>'
+  host:      '<%= ENV["db_yml_host"] %>'
+  reconnect: true
+  pool: 2  
