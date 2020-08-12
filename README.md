@@ -17,9 +17,9 @@ As we have seen in the EYCloud deployments, if a `db:migrate` fails then the dep
 The above show that a carefully chosen `readiness probe` is the key in order handle long running migrations. We have used successfully the following:
 
 ```
-deis config set DEIS_DEPLOY_TIMEOUT=600 --app=<app_name>
+eyk config set DEIS_DEPLOY_TIMEOUT=600 --app=<app_name>
 
-deis healthchecks:set readiness exec stat /tmp/migration-ready --type=migration --initial-delay=10 --period-seconds=10 --success-threshold=1 --failure-threshold=60 --app=<app_name>
+eyk healthchecks:set readiness exec stat /tmp/migration-ready --type=migration --initial-delay=10 --period-seconds=10 --success-threshold=1 --failure-threshold=60 --app=<app_name>
 
 ```
 You may check for the details of the setting [DEIS_DEPLOY_TIMEOUT](https://docs.teamhephy.com/applications/deploying-apps/#tuning-application-settings)
@@ -29,6 +29,28 @@ The web process will consist of one or more pods that will run the web server (i
 
 ### sidekiq
 The web process will consist of one or more pods that will run the sidekiq workers.
+
+# Configuration
+
+This application consists of the rails app and also sidekiq. This means that it will need access to `database` and `redis`. By default the services that require data persistency are not hosted within EYK. Given that we have access to those resources, the application will use them via the environment variables set using `eyk config:set` command.
+
+Specifically, the `redis` part can be configured via `eyk config:set REDIS_URL=redis://ec2-xxx-xxx-xxx-xxx.us-east-2.compute.amazonaws.com:6379/0`. Since rails has the ability to pick up the `REDIS_URL` parameter from the environment, we can use it just by setting it. In the case of `database` we could use the environment viable [DATABASE_URL](https://edgeguides.rubyonrails.org/configuring.html#configuring-a-database), but we have chosen to follow a more advanced route. Within the directory `ky-specific` we have `config/database.yml.erb`, which is a template ready to be filled with environment variables. These variables are available during the docker build stage via: 
+
+```
+eyk config:set DOCKER_BUILD_ARGS='{"DEIS_DOCKER_BUILD_ARGS_ENABLED":"1","db_yml_dbname":"xxxxx","db_yml_user":"deploy","db_yml_password":"xxxxxxx","db_yml_host":"ec2-xxx-xxx-xxx-xxx.us-east-2.compute.amazonaws.com"}' --app=<app_name>
+```
+
+The above command will make the following variables available: 
+
+```
+ARG db_yml_dbname
+ARG db_yml_user
+ARG db_yml_password
+ARG db_yml_host
+RUN erb -T - ./ky-specific/config/database.yml.erb > config/database.yml
+```
+
+during docker build, so the command `RUN erb -T - ./ky-specific/config/database.yml.erb > config/database.yml` will result to the `config/database.yml` file being present for the application.
 
 # Autoscaling
 In KontainerYard the notion of Autoscaling means different things according to the context. We have the following contexts:
@@ -44,12 +66,12 @@ This is a k8s component that controls the number of instances in the cluster. Al
 
 ### pod Autoscaling
 
-The pod Autoscaling in the KontainerYard is actually the [hephy's HPA](https://docs.teamhephy.com/applications/managing-app-processes/#autoscale). This can be set via the `deis autoscale` command. The pod Autoscaling is based on cpu/memory usage rules. 
+The pod Autoscaling in the KontainerYard is actually the [hephy's HPA](https://docs.teamhephy.com/applications/managing-app-processes/#autoscale). This can be set via the `eyk autoscale` command. The pod Autoscaling is based on cpu/memory usage rules. 
 
 ### custom Autoscaling
-This is a KontainerYard feature. The custom Autoscaling context refers to pods. We can set custom rules in order to decide the scaling of the pods. We start by exposing a `/metrics` route that outputs the needed metrics (e.g. sidekiq workers and queue size). Prometheus will scrape the `/metrics` route of the application and decide on if the pods need scaling or not. Setting the appropriate configuration is more complicated compared to `deis autoscale`, but gives more control.
+This is a KontainerYard feature. The custom Autoscaling context refers to pods. We can set custom rules in order to decide the scaling of the pods. We start by exposing a `/metrics` route that outputs the needed metrics (e.g. sidekiq workers and queue size). Prometheus will scrape the `/metrics` route of the application and decide on if the pods need scaling or not. Setting the appropriate configuration is more complicated compared to `eyk autoscale`, but gives more control.
 
-Although the `/metrics` route could be part of the application, in this example we have decided to create a [mountable rails engine](https://guides.rubyonrails.org/engines.html). This means that we can separate the KontainerYard only components. In this example, the directory `ky_metrics` is the one holding the mountable rails engine that exposes the `/metrics` route. In order to show the great flexibility of the application, we have added the needed "hooks" in the `Dockerfile`. These "hooks" will actually modify the `Gemfile` and `config/routes.rb` in order to include the `ky_metrics` in `Gemfile` and expose `/metrics` in `config/routes.rb`. While we could simply make it part of the application in the first place, this option shows how the `Dockerfile` can be used in order to customize the deployment and also the application itself.  
+Although the `/metrics` route could be part of the application, in this example we have decided to create a [mountable rails engine](https://guides.rubyonrails.org/engines.html). This means that we can separate the KontainerYard only components. In this example, the directory `ky-specific/ky_metrics` is the one holding the mountable rails engine that exposes the `/metrics` route. In order to show the great flexibility of the application, we have added the needed "hooks" in the `Dockerfile`. These "hooks" will actually modify the `Gemfile` and `config/routes.rb` in order to include the `ky_metrics` in `Gemfile` and expose `/metrics` in `config/routes.rb`. While we could simply make it part of the application in the first place, this option shows how the `Dockerfile` can be used in order to customize the deployment and also the application itself.  
 
 In our example the `/metrics` route will expose the following information:
 

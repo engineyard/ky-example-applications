@@ -14,7 +14,7 @@ WORKDIR /app
 COPY . ./
 RUN gem install bundler -v '1.16.3' && bundle install --without development test --jobs 20 --retry 5
 
-RUN test 0 == `grep ky_metrics Gemfile | wc -l` && echo "gem 'ky_metrics', path: 'ky_metrics'" >> Gemfile;echo 0 #this will append the gem ONLY if id does not alredy exist. The ";echo 0" is to prevent the build fail
+RUN test 0 == `grep ky_metrics Gemfile | wc -l` && echo "gem 'ky_metrics', path: 'ky-specific/ky_metrics'" >> Gemfile;echo 0 #this will append the gem ONLY if id does not alredy exist. The ";echo 0" is to prevent the build fail
 RUN gem install bundler -v '1.16.3' && bundle install --without development test --jobs 20 --retry 5
 
 
@@ -24,10 +24,11 @@ RUN test 0 == `grep KyMetrics config/routes.rb | wc -l` && sed -i '/end/s/end/  
 RUN wget https://github.com/ess/cronenberg/releases/download/v1.0.0/cronenberg-v1.0.0-linux-amd64 -O /usr/bin/cronenberg && chmod +x /usr/bin/cronenberg
 
 # Test that the database.yml works as expected
+ARG db_yml_dbname
+ARG db_yml_user
 ARG db_yml_password
 ARG db_yml_host
 RUN erb -T - ./ky-specific/config/database.yml.erb > config/database.yml
-RUN cat config/database.yml
 RUN bundle exec rake db:migrate:status
 
 # Make the migration script runable
